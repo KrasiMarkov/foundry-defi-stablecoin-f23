@@ -125,16 +125,29 @@ contract DSCEngine is ReentrancyGuard {
     // External Functions //
     ///////////////////////
 
-    function depositCollateralAndMintDsc() external {}
+    /*
+     * 
+     * @param tokenCollateralAddress - Address of the token to deposit as collateral
+     * @param amountCollateral - Amount of collateral to deposit
+     * @param amountDscToMint - Amount of DSC to mint
+     * @notice this function will deposit your collateral and mint DSC in one transaction
+     */
+    function depositCollateralAndMintDsc(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDscToMint
+    ) external {
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        mintDsc(amountDscToMint);
+    }
 
     /*
      * @notice Follows CEI
      * @param tokenCollateralAddress - Address of the token to deposit as collateral
      * @param amountCollateral - Amount of collateral to deposit
      */
-
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
-        external
+        public
         moreThanZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
         nonReentrant
@@ -157,7 +170,7 @@ contract DSCEngine is ReentrancyGuard {
      * @param amountDscToMint - Amount of decentralized stablecoin to mint
      * @notice they must have more collateral value than the minimum threshold
      */
-    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) nonReentrant {
+    function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
         s_DSCMinted[msg.sender] += amountDscToMint;
         // If they minted too much ($150 DSC, $100 ETH)
         _revertIfHealthFactorIsBroken(msg.sender);
