@@ -83,6 +83,7 @@ contract DSCEngine is ReentrancyGuard {
     ///////////////////////
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
+    event CollateralRedeemed(address indexed user, address indexed token, uint256 indexed amount);
 
     ///////////////////////
     // Modifiers        //
@@ -161,9 +162,34 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function redeemCollateralForDsc() external {}
+    /*
+     * @param tokenCollateralAddress - The collateral address to redeem
+     * @param amountCollateral - Amount of collateral to redeem
+     * @param amountDsc - Amount of decentralized stablecoin to burn
+     * @notice this function will burn DSC and redeem your collateral in one transaction
+     */
+    function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDsc) external { 
+        burnDsc(amountDsc);
+        redeemCollateral(tokenCollateralAddress, amountCollateral);
+        // redeemCollateral already checks health factor
+    }
 
-    function redeemCollateral() external {}
+    // In order to redeem collateral.
+    // Health factor must be over 1 AFTER collateral pulled
+    // DRY Do not repeat yourself
+    // CEI
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) public moreThanZero(amountCollateral) nonReentrant{
+
+        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemed(msg.sender, tokenCollateralAddress, amountCollateral);
+        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender, amountCollateral);
+        
+        if(!success) {
+            revert DSCEngine__TransferFailed();
+        }
+
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     /*
      * @notice Follows CEI
@@ -180,7 +206,16 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function burnDsc() external {}
+    function burnDsc(uint256 amountDSC) public moreThanZero(amountDSC) {
+
+        s_DSCMinted[msg.sender] -= amountDSC;
+        bool success = i_dsc.transferFrom(msg.sender, address(this), amountDSC);
+        if(!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        i_dsc.burn(amountDSC);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     function liquidate() external {}
 
